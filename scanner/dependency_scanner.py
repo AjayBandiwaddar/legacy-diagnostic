@@ -6,7 +6,6 @@ Extend KNOWN_MIN_VERSIONS as needed before the demo.
 import re
 import os
 
-# package -> minimum version we consider "not legacy". Below this = flagged.
 KNOWN_MIN_VERSIONS = {
     "django": (3, 2, 0),
     "requests": (2, 25, 0),
@@ -26,10 +25,6 @@ def _parse_version(v):
 
 
 def scan_requirements(filepath):
-    """
-    Returns a list of finding dicts for outdated dependencies.
-    Each finding matches the shape expected by the Lambda handler.
-    """
     findings = []
     if not os.path.exists(filepath):
         return findings

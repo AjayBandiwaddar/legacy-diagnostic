@@ -5,8 +5,6 @@ and known-legacy SDK patterns. Rule-based (regex over source text), no ML.
 import os
 import re
 
-# boto3 client names for AWS services that are retired or deprecated.
-# Extend before demo if you seed more examples.
 DEPRECATED_SERVICES = {
     "sdb": "Amazon SimpleDB — retired service, no longer recommended for new use",
     "machinelearning": "Amazon Machine Learning — retired 2019, replaced by SageMaker",

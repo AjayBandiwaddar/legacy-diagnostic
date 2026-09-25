@@ -11,10 +11,6 @@ Bedrock agent's Lambda action group expects:
 
 Usage:
     python scan.py <path_to_target_repo>
-
-This is what gets wired into the Lambda handler in place of the hardcoded
-response once the AWS side (agent + action group) is confirmed working
-end-to-end.
 """
 import sys
 import json
