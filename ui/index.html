@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Legacy System Health Diagnostic Agent</title>
+<style>
+  :root {
+    --critical: #d32f2f;
+    --high: #f57c00;
+    --medium: #fbc02d;
+    --low: #388e3c;
+    --bg: #0f1117;
+    --card: #1a1d26;
+    --text: #e8e8e8;
+    --muted: #9aa0ac;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    padding: 2rem;
+  }
+  .container { max-width: 900px; margin: 0 auto; }
+  h1 { font-size: 1.6rem; margin-bottom: 0.25rem; }
+  .subtitle { color: var(--muted); margin-bottom: 2rem; }
+  .scan-panel {
+    background: var(--card);
+    border-radius: 10px;
+    padding: 1.5rem;
+    margin-bottom: 2rem;
+  }
+  input[type=text] {
+    background: #0f1117;
+    border: 1px solid #333;
+    color: var(--text);
+    padding: 0.6rem;
+    border-radius: 6px;
+    width: 60%;
+    font-family: monospace;
+  }
+  button {
+    background: #4a6cf7;
+    color: white;
+    border: none;
+    padding: 0.6rem 1.4rem;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 1rem;
+    margin-left: 0.5rem;
+  }
+  button:hover { background: #3a5ce0; }
+  button:disabled { background: #444; cursor: not-allowed; }
+  .summary-card {
+    background: var(--card);
+    border-radius: 10px;
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+    border-left: 4px solid #4a6cf7;
+  }
+  .fix-first {
+    background: var(--card);
+    border-radius: 10px;
+    padding: 1rem 1.5rem;
+    margin-bottom: 1.5rem;
+    border-left: 4px solid var(--critical);
+    font-weight: 600;
+  }
+  .finding-card {
+    background: var(--card);
+    border-radius: 10px;
+    padding: 1.25rem;
+    margin-bottom: 1rem;
+    border-left: 4px solid var(--muted);
+  }
+  .finding-card.CRITICAL { border-left-color: var(--critical); }
+  .finding-card.HIGH { border-left-color: var(--high); }
+  .finding-card.MEDIUM { border-left-color: var(--medium); }
+  .finding-card.LOW { border-left-color: var(--low); }
+  .badge {
+    display: inline-block;
+    font-size: 0.7rem;
+    font-weight: 700;
+    padding: 0.2rem 0.6rem;
+    border-radius: 4px;
+    margin-right: 0.5rem;
+    text-transform: uppercase;
+  }
+  .badge.CRITICAL { background: var(--critical); }
+  .badge.HIGH { background: var(--high); }
+  .badge.MEDIUM { background: var(--medium); color: #222; }
+  .badge.LOW { background: var(--low); }
+  .finding-file { color: var(--muted); font-family: monospace; font-size: 0.85rem; }
+  .finding-what { margin: 0.5rem 0; font-weight: 600; }
+  .finding-why { color: var(--muted); margin-bottom: 0.5rem; }
+  .finding-fix { color: #7ea8ff; font-size: 0.9rem; }
+  .loading { color: var(--muted); font-style: italic; }
+  .error { color: var(--critical); }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>Legacy System Health Diagnostic Agent</h1>
+  <div class="subtitle">Team LSD — Legacy Systems Diagnosticians</div>
+
+  <div class="scan-panel">
+    <label for="targetPath" style="display:block; margin-bottom:0.5rem; color:var(--muted);">
+      Target directory to scan
+    </label>
+    <input type="text" id="targetPath" value="../sample_legacy_repo">
+    <button id="scanBtn" onclick="runScan()">Run Diagnostic Scan</button>
+  </div>
+
+  <div id="results"></div>
+</div>
+
+<script>
+async function runScan() {
+  const btn = document.getElementById('scanBtn');
+  const targetPath = document.getElementById('targetPath').value;
+  const resultsDiv = document.getElementById('results');
+
+  btn.disabled = true;
+  btn.textContent = 'Scanning...';
+  resultsDiv.innerHTML = '<p class="loading">Running scanners and generating roadmap...</p>';
+
+  try {
+    const res = await fetch('/scan', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ target_path: targetPath })
+    });
+
+    if (!res.ok) {
+      const err = await res.json();
+      resultsDiv.innerHTML = `<p class="error">Error: ${err.detail}</p>`;
+      return;
+    }
+
+    const data = await res.json();
+    renderResults(data.roadmap);
+  } catch (e) {
+    resultsDiv.innerHTML = `<p class="error">Request failed: ${e.message}</p>`;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Run Diagnostic Scan';
+  }
+}
+
+function renderResults(roadmap) {
+  const resultsDiv = document.getElementById('results');
+  let html = '';
+
+  html += `<div class="summary-card">
+    <strong>Executive Summary</strong>
+    <p>${roadmap.executive_summary}</p>
+  </div>`;
+
+  html += `<div class="fix-first">⚠ ${roadmap.fix_first}</div>`;
+
+  roadmap.roadmap.forEach(item => {
+    html += `
+      <div class="finding-card ${item.priority}">
+        <span class="badge ${item.priority}">${item.priority}</span>
+        <span class="finding-file">${item.file}</span>
+        <div class="finding-what">${item.what_it_is}</div>
+        <div class="finding-why">${item.why_it_matters}</div>
+        <div class="finding-fix">→ ${item.suggested_fix}</div>
+      </div>
+    `;
+  });
+
+  resultsDiv.innerHTML = html;
+}
+</script>
+</body>
+</html>
