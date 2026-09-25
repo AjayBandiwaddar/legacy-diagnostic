@@ -40,3 +40,10 @@ $env:LSD_APP_API_TOKEN="replace-me"
 
 Use **Load seeded legacy demo** for a no-upload demo. The scanner is heuristic,
 not a replacement for a security review; ZIPs are never extracted to disk.
+
+The remediation view sends only sanitized finding context through Lambda to
+Groq. Groq returns validated, single-line code patches: medium/low patches apply
+automatically in memory, while critical/high patches are never applied and are
+shown as acknowledged manual actions. The UI shows redacted before/after evidence,
+rescans the result, and provides a separate fixed ZIP containing only automatic
+low/medium changes; it never modifies the upload in place.

@@ -32,7 +32,7 @@ def _scan_text(name, text):
         (r"-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----", "hardcoded_secret", "Private key embedded in source", "critical", "Remove the key, rotate it, and use a secret manager"),
         (r"\b(?:import\s+boto\b|from\s+boto\b)", "legacy_boto_v2", "Legacy boto v2 SDK usage", "high", "Migrate to boto3"),
         (r"\b(?:public-read|public-read-write)\b", "public_s3_acl", "Public-read S3 ACL", "high", "Keep S3 private and use explicit, least-privilege access"),
-        (r"\brequest_spot_(?:instances|fleet)\b", "legacy_ec2_spot_api", "Legacy EC2 Spot request API", "medium", "Use EC2 Fleet or Auto Scaling instead"),
+        (r"\brequest_spot_(?:instances|fleet)\b", "legacy_ec2_spot_api", "Legacy EC2 Spot request API", "high", "Use EC2 Fleet or Auto Scaling instead"),
         (r"\b(?:TLSv1|PROTOCOL_TLSv1)\b", "weak_tls", "TLS 1.0 usage", "high", "Require TLS 1.2 or newer"),
         (r"\b(?:hashlib\.)?(?:md5|sha1)\s*\(", "weak_hash", "MD5 or SHA-1 usage", "medium", "Use SHA-256 or a purpose-built password hash"),
         (r"\beval\s*\(", "unsafe_eval", "eval() usage", "high", "Replace eval() with explicit parsing or a safe allow-list"),
@@ -91,14 +91,45 @@ def scan_files(files):
     return {"findings": findings, "files_scanned": len(files)}
 
 
-def scan_directory(directory):
+def redact_source_line(line):
+    line = re.sub(r"\bAKIA[0-9A-Z]{16}\b", "[REDACTED_AWS_ACCESS_KEY]", line)
+    line = re.sub(
+        r"(?i)(\b[A-Za-z_]*(?:api[_-]?key|password|passwd|secret|token)[A-Za-z_]*\s*[:=]\s*)['\"][^'\"]+['\"]",
+        r'\1"[REDACTED]"',
+        line,
+    )
+    if "PRIVATE KEY-----" in line:
+        return "[REDACTED_PRIVATE_KEY_MARKER]"
+    return line
+
+
+def remediation_contexts(files, findings):
+    contexts = []
+    for index, finding in enumerate(findings):
+        lines = files.get(finding["file"], "").splitlines()
+        number = finding["line"]
+        if 1 <= number <= len(lines):
+            contexts.append({
+                "finding_index": index,
+                "file": finding["file"],
+                "line": number,
+                "source_line": redact_source_line(lines[number - 1]),
+            })
+    return contexts
+
+
+def files_from_directory(directory):
     root = Path(directory)
     files = {}
     for path in root.rglob("*"):
         if not path.is_file() or any(part in SKIP_DIRS for part in path.parts) or path.suffix.lower() not in TEXT_SUFFIXES or path.stat().st_size > MAX_FILE_BYTES:
             continue
         files[path.relative_to(root).as_posix()] = path.read_text(encoding="utf-8", errors="replace")
-    return scan_files(files)
+    return files
+
+
+def scan_directory(directory):
+    return scan_files(files_from_directory(directory))
 
 
 def scan_zip(data):
